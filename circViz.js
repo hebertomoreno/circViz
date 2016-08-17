@@ -7,6 +7,9 @@ var padding = 20;
 var totalPrecio = 0, 
 	totalValor  = 0,
 	numValores = 0;
+var xDom;
+var yDom;
+var vDom;
 
 function circViz () {
 	var svg = d3.select("body")
@@ -39,6 +42,7 @@ function circViz () {
 	var avgXAxis = d3.axisTop()
 					.scale(xScale)
 					.ticks(0);
+	
 
 	d3.csv("dataset.csv", function(error, data) {
 		var f = d3.format(".2");
@@ -52,7 +56,48 @@ function circViz () {
 			totalValor += d.valor;
 			numValores++;
 		})
+		/***Brush Declaration***/
+	var brush = d3.brush().on("end", brushended),
+	idleTimeout,
+	idleDelay = 350;
+	/***Brushended function***/
+	function brushended()
+	{
+		var s = d3.event.selection;
+		if (!s) {
+		if (!idleTimeout) return idleTimeout = setTimeout(idled, idleDelay);
+			xScale.domain(xDom);
+			yScale.domain(yDom);
+		} else {
+			xScale.domain([s[0][0], s[1][0]].map(xScale.invert, xScale));
+			yScale.domain([s[1][1], s[0][1]].map(yScale.invert, yScale));
 
+			svg.select(".brush").call(brush.move, null);
+		}
+		zoom();
+	}
+
+	function zoom()
+	{
+	    var t = svg.transition().duration(750);
+
+	    svg.select(".xaxis").transition(t).call(xAxis);
+	    svg.select(".yaxis").transition(t).call(yAxis);
+
+	    svg.selectAll("circle").transition(t)
+								.attr("class", "circles")
+								.attr("cx", function(d) {
+									return xScale(d.precio);
+								})
+								.attr("cy", function(d) {
+									return yScale(d.valor);
+								});
+	}
+	/***Idle function***/
+	function idled()
+	{
+		idleTimeout = null;
+	}
 		var avgPrecio = totalPrecio / numValores;
 		var avgValor = totalValor / numValores;
 		/*Define the domains using the csv information*/
@@ -93,15 +138,19 @@ function circViz () {
 			var alph = +f(aScale(d.volumen));
 			return "rgba("+rgbR+","+rgbG+","+rgbB+","+alph+")";
 		});
-		svg.app
+		/*Draw Brush for zooming*/
+		svg.append("g")
+	    .attr("class", "brush")
+	    .call(brush);
 		/*Draw Axes*/
 		svg.append("g")
-			.attr("class", "axis")
+			.attr("class", "xaxis")
 			.attr("transform", "translate(0, "+(h-margin.top)+")")
 			.call(xAxis);
 		svg.append("g")
-			.attr("class", "axis")
+			.attr("class", "yaxis")
 			.call(yAxis);
+		/*Draw supplementary avg axes*/
 		svg.append("g")
 			.attr("class", "avgAxis")
 			.attr("transform", "translate("+xScale(avgPrecio)+",0)")
@@ -110,6 +159,7 @@ function circViz () {
 			.attr("class", "avgAxis")
 			.attr("transform", "translate(0,"+yScale(avgValor)+")")
 			.call(avgXAxis);
+		/*Display Avg*/
 		d3.select("body")
 			.append("h1")
 			.text("Promedio Precio = "+ avgPrecio);
